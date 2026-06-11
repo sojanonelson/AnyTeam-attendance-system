@@ -29,14 +29,80 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
           const html5Qrcode = new Html5Qrcode(scannerId);
           qrReaderRef.current = html5Qrcode;
 
+          // Enumerate cameras to find the 1x back camera
+          let cameraIdOrConstraint: any = { facingMode: 'environment' };
+          try {
+            const devices = await Html5Qrcode.getCameras();
+            console.log('Available cameras found:', devices);
+            if (devices && devices.length > 0) {
+              const backCameras = devices.filter(d => {
+                const label = d.label.toLowerCase();
+                return label.includes('back') || 
+                       label.includes('rear') || 
+                       label.includes('environment') ||
+                       label.includes('camera 0') ||
+                       label.includes('camera 1') ||
+                       label.includes('camera 2') ||
+                       label === '';
+              });
+
+              if (backCameras.length > 0) {
+                // Score back cameras to find the 1x main camera
+                // Standard main back cameras on iOS/Android often contain:
+                // "wide" (but NOT "ultra wide"), "main", "primary", "1x", or just "back camera"
+                // Ultra-wide camera labels contain: "ultra", "wide angle" (sometimes), "0.5x", "0.6x", "tele" (telephoto)
+                const scoredCameras = backCameras.map(cam => {
+                  const label = cam.label.toLowerCase();
+                  let score = 0;
+
+                  // High preference for primary, main, 1x
+                  if (label.includes('main') || label.includes('primary') || label.includes('1x') || label.includes('camera 0')) {
+                    score += 15;
+                  }
+
+                  // Moderate preference for "wide" (as in "Back Wide Camera" on iOS, which is the 1x lens)
+                  // But exclude if it's "ultra wide"
+                  if (label.includes('wide') && !label.includes('ultra')) {
+                    score += 10;
+                  }
+
+                  // Heavy penalty for ultra-wide, 0.5x zoom, etc.
+                  if (label.includes('ultra') || label.includes('0.5') || label.includes('0.6') || label.includes('0.7') || label.includes('wide angle')) {
+                    score -= 30;
+                  }
+
+                  // Moderate penalty for telephoto or high zoom (e.g. 2x, 3x, 5x, tele)
+                  if (label.includes('tele') || label.includes('zoom') || label.includes('2x') || label.includes('3x') || label.includes('5x')) {
+                    score -= 15;
+                  }
+
+                  return { camera: cam, score };
+                });
+
+                // Sort descending by score
+                scoredCameras.sort((a, b) => b.score - a.score);
+                console.log('Scored back cameras:', scoredCameras);
+
+                // Use the highest scored camera
+                cameraIdOrConstraint = scoredCameras[0].camera.id;
+              } else {
+                // Fallback to first camera if no specific back camera identified
+                cameraIdOrConstraint = devices[0].id;
+              }
+            }
+          } catch (camErr) {
+            console.warn('Failed to enumerate cameras, falling back to facingMode constraint:', camErr);
+          }
+
           await html5Qrcode.start(
-            { facingMode: 'environment' },
+            cameraIdOrConstraint,
             {
               fps: 10,
               qrbox: (width, height) => {
                 const size = Math.min(width, height) * 0.7;
                 return { width: size, height: size };
               },
+              aspectRatio: 1.0,
             },
             async (decodedText) => {
               await stopScanner();
@@ -117,6 +183,22 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
       {/* Camera Scanning View */}
       {isScanning && (
         <div className="relative bg-slate-950 rounded-xl overflow-hidden border border-slate-700 aspect-square mb-6">
+          <style dangerouslySetInnerHTML={{__html: `
+            #${scannerId} {
+              border: none !important;
+              width: 100% !important;
+              height: 100% !important;
+            }
+            #${scannerId} video {
+              width: 100% !important;
+              height: 100% !important;
+              object-fit: cover !important;
+              border-radius: 12px !important;
+            }
+            #${scannerId} canvas {
+              display: none !important;
+            }
+          `}} />
           <div id={scannerId} className="w-full h-full"></div>
           
           <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 aspect-square border-2 border-dashed border-indigo-500/50 pointer-events-none rounded-lg flex items-center justify-center">
@@ -125,7 +207,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
 
           <button
             onClick={stopScanner}
-            className="absolute top-3 right-3 p-2 bg-white/90 hover:bg-white text-slate-700 rounded-full transition shadow"
+            className="absolute top-3 right-3 p-2 bg-white/90 hover:bg-white text-slate-700 rounded-full transition shadow z-10"
             title="Cancel Scanning"
           >
             <X className="w-4 h-4" />
