@@ -25,11 +25,11 @@ router.get('/team/:teamId', authMiddleware, async (req: AuthRequest, res) => {
 
     // Get logs with member details populated
     const logs = await AttendanceLog.find({ teamId })
-      .populate('memberId', 'name email profileImage')
+      .populate('memberId', 'name email profileImage createdAt')
       .sort({ checkInTime: -1 });
 
     // Get list of all members to know who is absent
-    const members = await Member.find({ teamId }).select('name email profileImage');
+    const members = await Member.find({ teamId }).select('name email profileImage createdAt');
 
     res.json({ logs, members });
   } catch (error: any) {

@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import Team from '../models/Team';
 import Member from '../models/Member';
+import AttendanceLog from '../models/AttendanceLog';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -34,7 +35,7 @@ router.get('/invite-info/:inviteCode', async (req, res) => {
 // Member Register
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, inviteCode, invitePassword } = req.body;
+    const { name, email, password, inviteCode, invitePassword, linkedinId, status } = req.body;
 
     if (!name || !email || !password || !inviteCode || !invitePassword) {
       return res.status(400).json({ message: 'Please enter all fields' });
@@ -71,7 +72,9 @@ router.post('/register', async (req, res) => {
       email: email.toLowerCase(),
       password: hashedPassword,
       teamId: team._id,
-      profileImage: '' // Default empty, user can upload in dashboard
+      profileImage: '', // Default empty, user can upload in dashboard
+      linkedinId: linkedinId || '',
+      status: status || 'Available'
     });
 
     const savedMember = await newMember.save();
@@ -88,7 +91,10 @@ router.post('/register', async (req, res) => {
         name: savedMember.name,
         email: savedMember.email,
         teamId: savedMember.teamId,
-        profileImage: savedMember.profileImage
+        profileImage: savedMember.profileImage,
+        linkedinId: savedMember.linkedinId,
+        status: savedMember.status,
+        createdAt: savedMember.createdAt
       }
     });
   } catch (error: any) {
@@ -127,7 +133,10 @@ router.post('/login', async (req, res) => {
         name: member.name,
         email: member.email,
         teamId: member.teamId,
-        profileImage: member.profileImage
+        profileImage: member.profileImage,
+        linkedinId: member.linkedinId,
+        status: member.status,
+        createdAt: member.createdAt
       }
     });
   } catch (error: any) {
@@ -160,7 +169,7 @@ router.put('/profile', authMiddleware, async (req: AuthRequest, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    const { name, email, profileImage } = req.body;
+    const { name, email, profileImage, linkedinId, status } = req.body;
     const member = await Member.findById(req.user.id);
     if (!member) {
       return res.status(404).json({ message: 'Member not found' });
@@ -175,6 +184,12 @@ router.put('/profile', authMiddleware, async (req: AuthRequest, res) => {
     if (profileImage !== undefined) {
       member.profileImage = profileImage; // Save base64 string
     }
+    if (linkedinId !== undefined) {
+      member.linkedinId = linkedinId;
+    }
+    if (status !== undefined) {
+      member.status = status;
+    }
 
     const updatedMember = await member.save();
     res.json({
@@ -182,7 +197,9 @@ router.put('/profile', authMiddleware, async (req: AuthRequest, res) => {
       name: updatedMember.name,
       email: updatedMember.email,
       teamId: updatedMember.teamId,
-      profileImage: updatedMember.profileImage
+      profileImage: updatedMember.profileImage,
+      linkedinId: updatedMember.linkedinId,
+      status: updatedMember.status
     });
   } catch (error: any) {
     res.status(500).json({ message: error.message });

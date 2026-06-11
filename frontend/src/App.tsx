@@ -3,12 +3,12 @@ import { SystemAdminDashboard } from './pages/SystemAdminDashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { MemberPortal } from './pages/MemberPortal';
 import { 
-  Building, User, Columns, ShieldCheck, 
-  Sparkles, ShieldCheck as SysShield 
+  Building, User, ShieldCheck, 
+  ShieldCheck as SysShield 
 } from 'lucide-react';
 
 function App() {
-  const [activeView, setActiveView] = useState<'system' | 'admin' | 'member' | 'split'>('admin');
+  const [activeView, setActiveView] = useState<'system' | 'admin' | 'member'>('admin');
   const [prefilledInvite, setPrefilledInvite] = useState<string>('');
 
   // Parse invite code from URL query parameters (e.g. ?join=ABCDEF)
@@ -69,15 +69,6 @@ function App() {
               <User className="w-3.5 h-3.5" />
               <span>Member Portal</span>
             </button>
-
-            <button
-              onClick={() => setActiveView('split')}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold shrink-0 transition ${activeView === 'split' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-              title="View Team Admin and Member portals side-by-side for local testing"
-            >
-              <Columns className="w-3.5 h-3.5" />
-              <span>Split View (Demo)</span>
-            </button>
           </div>
 
         </div>
@@ -102,39 +93,11 @@ function App() {
             <MemberPortal prefilledInviteCode={prefilledInvite} />
           </div>
         )}
-
-        {activeView === 'split' && (
-          <div className="w-full max-w-[1700px] mx-auto px-4 flex flex-col lg:flex-row gap-6 animate-fadeIn">
-            
-            {/* Team Admin Side */}
-            <div className="flex-1 border-b lg:border-b-0 lg:border-r border-slate-200 pb-6 lg:pb-0 lg:pr-6">
-              <div className="mb-4 bg-indigo-50 border border-indigo-200 px-4 py-2.5 rounded-xl flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 animate-pulse-slow" />
-                <span className="text-[11px] text-indigo-700 font-semibold">
-                  <strong>DEMO:</strong> Team Admin Portal. Create teams, get invite links, and project the rotating QR code.
-                </span>
-              </div>
-              <AdminDashboard />
-            </div>
-
-            {/* Member Side */}
-            <div className="flex-1">
-              <div className="mb-4 bg-purple-50 border border-purple-200 px-4 py-2.5 rounded-xl flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-purple-600 shrink-0 animate-pulse-slow" />
-                <span className="text-[11px] text-purple-700 font-semibold">
-                  <strong>DEMO:</strong> Member Portal. Paste the QR token to mark attendance!
-                </span>
-              </div>
-              <MemberPortal prefilledInviteCode={prefilledInvite} />
-            </div>
-
-          </div>
-        )}
       </main>
 
       {/* Footer */}
       <footer className="py-6 border-t border-slate-200 bg-white/50 text-center text-xs text-slate-400 mt-auto">
-        <p>Anyteam Attendance System © {new Date().getFullYear()} • Clean White Theme • Powered by React & MongoDB</p>
+        <p>Anyteam Attendance System © 2026 • Clean White Theme • Powered by React & MongoDB • Software Team Webyfy IoT Pvt Ltd</p>
       </footer>
     </div>
   );

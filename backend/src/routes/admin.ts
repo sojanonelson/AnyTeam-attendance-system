@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import Admin from '../models/Admin';
 import Team from '../models/Team';
 import Member from '../models/Member';
+import AttendanceLog from '../models/AttendanceLog';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -188,6 +189,60 @@ router.get('/system/admins', authMiddleware, async (req: AuthRequest, res) => {
       .sort({ username: 1 });
 
     res.json(admins);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Admin: Mark past attendance for a member
+router.post('/mark-member-past-attendance', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (req.user?.role !== 'team_admin' && req.user?.role !== 'system_admin') {
+      return res.status(403).json({ message: 'Access denied: admins only' });
+    }
+
+    const { memberId, date, teamId } = req.body;
+    if (!memberId || !date || !teamId) {
+      return res.status(400).json({ message: 'Member ID, date, and team ID are required' });
+    }
+
+    // Verify admin owns the team (system admins can bypass)
+    if (req.user?.role !== 'system_admin') {
+      const team = await Team.findOne({ _id: teamId, adminId: req.user.id });
+      if (!team) {
+        return res.status(404).json({ message: 'Team not found or unauthorized' });
+      }
+    }
+
+    // Verify member belongs to this team
+    const member = await Member.findOne({ _id: memberId, teamId });
+    if (!member) {
+      return res.status(404).json({ message: 'Member not found in this team' });
+    }
+
+    // Check if log already exists
+    const existingLog = await AttendanceLog.findOne({ memberId, teamId, date });
+    if (existingLog) {
+      return res.status(400).json({ message: 'Attendance already marked for this date' });
+    }
+
+    // Create log
+    const checkInTime = new Date(`${date}T09:00:00`);
+    const log = new AttendanceLog({
+      memberId,
+      teamId,
+      date,
+      checkInTime,
+      checkOutTime: null,
+      status: 'present'
+    });
+
+    await log.save();
+
+    res.status(201).json({
+      message: `Attendance marked successfully for ${member.name} on ${date}!`,
+      log
+    });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

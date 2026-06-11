@@ -6,6 +6,7 @@ interface AttendanceReportProps {
   logs: any[];
   members?: any[]; // only for admin
   onRefresh?: () => void;
+  memberCreatedAt?: string;
 }
 
 export const AttendanceReport: React.FC<AttendanceReportProps> = ({
@@ -13,13 +14,15 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
   logs,
   members = [],
   onRefresh,
+  memberCreatedAt,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDate, setFilterDate] = useState('');
+  const [startDate, setStartDate] = useState('');
 
   // Calculate working hours helper
   const calculateDuration = (checkIn: string, checkOut: string | null): string => {
-    if (!checkOut) return 'Active now';
+    if (!checkOut) return 'OK';
     const diff = new Date(checkOut).getTime() - new Date(checkIn).getTime();
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -39,6 +42,142 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
     return new Date(timeStr).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Helper to determine if a date is a leave day (Sundays, 2nd & 4th Saturdays)
+  const isLeaveDay = (dateStr: string): boolean => {
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return false;
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    
+    const d = new Date(year, month, day);
+    const dayOfWeek = d.getDay();
+    if (dayOfWeek === 0) return true; // Sunday
+    
+    if (dayOfWeek === 6) { // Saturday
+      const dom = d.getDate();
+      const weekNum = Math.ceil(dom / 7);
+      if (weekNum === 2 || weekNum === 4) {
+        return true; // 2nd or 4th Saturday
+      }
+    }
+    return false;
+  };
+
+  // Helper to generate dates range in YYYY-MM-DD (local)
+  const getDatesInRange = (startDateStr: string, endDateStr: string): string[] => {
+    const dates: string[] = [];
+    const startParts = startDateStr.split('-');
+    const endParts = endDateStr.split('-');
+    if (startParts.length !== 3 || endParts.length !== 3) return [];
+    
+    const start = new Date(parseInt(startParts[0], 10), parseInt(startParts[1], 10) - 1, parseInt(startParts[2], 10));
+    const end = new Date(parseInt(endParts[0], 10), parseInt(endParts[1], 10) - 1, parseInt(endParts[2], 10));
+    
+    while (start <= end) {
+      const year = start.getFullYear();
+      const month = String(start.getMonth() + 1).padStart(2, '0');
+      const day = String(start.getDate()).padStart(2, '0');
+      dates.push(`${year}-${month}-${day}`);
+      start.setDate(start.getDate() + 1);
+    }
+    return dates;
+  };
+
+  // Generate complete logs (combining real logs + virtual absent logs)
+  const getCombinedLogs = (): any[] => {
+    let earliestDateStr = startDate;
+    if (!earliestDateStr) {
+      const fourteenDaysAgo = new Date();
+      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+      earliestDateStr = `${fourteenDaysAgo.getFullYear()}-${String(fourteenDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(fourteenDaysAgo.getDate()).padStart(2, '0')}`;
+      
+      if (logs.length > 0) {
+        const logDates = logs.map(l => l.date).filter(Boolean).sort();
+        if (logDates.length > 0 && logDates[0] < earliestDateStr) {
+          earliestDateStr = logDates[0];
+        }
+      }
+    }
+    
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    
+    if (earliestDateStr > todayStr) {
+      earliestDateStr = todayStr;
+    }
+    
+    const allDates = getDatesInRange(earliestDateStr, todayStr);
+
+    const combined = [...logs];
+
+    if (viewMode === 'admin') {
+      allDates.forEach((date) => {
+        if (isLeaveDay(date)) return;
+
+        members.forEach((member) => {
+          const memberIdStr = member._id || member.id;
+          
+          const memberCreatedAtStr = member.createdAt 
+            ? new Date(member.createdAt).toISOString().split('T')[0] 
+            : earliestDateStr;
+            
+          if (date < memberCreatedAtStr) return;
+
+          const hasLog = logs.some(l => {
+            const lMemberId = l.memberId?._id || l.memberId?.id || l.memberId;
+            return lMemberId === memberIdStr && l.date === date;
+          });
+
+          if (!hasLog) {
+            combined.push({
+              _id: `absent-${memberIdStr}-${date}`,
+              memberId: member,
+              date: date,
+              checkInTime: `${date}T09:00:00.000Z`,
+              checkOutTime: null,
+              status: 'absent'
+            });
+          }
+        });
+      });
+    } else {
+      const memberCreatedAtStr = memberCreatedAt 
+        ? new Date(memberCreatedAt).toISOString().split('T')[0] 
+        : earliestDateStr;
+
+      allDates.forEach((date) => {
+        if (isLeaveDay(date)) return;
+        if (date < memberCreatedAtStr) return;
+
+        const hasLog = logs.some(l => l.date === date);
+        if (!hasLog) {
+          combined.push({
+            _id: `absent-member-${date}`,
+            date: date,
+            checkInTime: `${date}T09:00:00.000Z`,
+            checkOutTime: null,
+            status: 'absent'
+          });
+        }
+      });
+    }
+
+    return combined.sort((a, b) => new Date(b.checkInTime).getTime() - new Date(a.checkInTime).getTime());
+  };
+
+  const combinedLogs = getCombinedLogs();
+
+  // Filter logs for View
+  const filteredLogs = combinedLogs.filter((log) => {
+    const matchesSearch = viewMode === 'member' || 
+      (log.memberId?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+       log.memberId?.email?.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesSingleDate = !filterDate || log.date === filterDate;
+    const matchesStartDate = !startDate || log.date >= startDate;
+    return matchesSearch && matchesSingleDate && matchesStartDate;
+  });
+
   // Export to CSV Helper
   const handleExportCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
@@ -49,19 +188,19 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
         const name = log.memberId?.name || 'Unknown';
         const email = log.memberId?.email || '';
         const date = log.date;
-        const checkIn = new Date(log.checkInTime).toISOString();
-        const checkOut = log.checkOutTime ? new Date(log.checkOutTime).toISOString() : 'N/A';
-        const duration = calculateDuration(log.checkInTime, log.checkOutTime);
+        const checkIn = log.status === 'absent' ? 'N/A' : new Date(log.checkInTime).toISOString();
+        const checkOut = log.status === 'absent' ? 'N/A' : (log.checkOutTime ? new Date(log.checkOutTime).toISOString() : 'N/A');
+        const duration = log.status === 'absent' ? 'N/A' : calculateDuration(log.checkInTime, log.checkOutTime);
         const status = log.status;
         csvContent += `"${name}","${email}","${date}","${checkIn}","${checkOut}","${duration}","${status}"\r\n`;
       });
     } else {
       csvContent += "Date,Check-In,Check-Out,Duration,Status\r\n";
-      logs.forEach((log) => {
+      filteredLogs.forEach((log) => {
         const date = log.date;
-        const checkIn = new Date(log.checkInTime).toISOString();
-        const checkOut = log.checkOutTime ? new Date(log.checkOutTime).toISOString() : 'N/A';
-        const duration = calculateDuration(log.checkInTime, log.checkOutTime);
+        const checkIn = log.status === 'absent' ? 'N/A' : new Date(log.checkInTime).toISOString();
+        const checkOut = log.status === 'absent' ? 'N/A' : (log.checkOutTime ? new Date(log.checkOutTime).toISOString() : 'N/A');
+        const duration = log.status === 'absent' ? 'N/A' : calculateDuration(log.checkInTime, log.checkOutTime);
         const status = log.status;
         csvContent += `"${date}","${checkIn}","${checkOut}","${duration}","${status}"\r\n`;
       });
@@ -75,15 +214,6 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
     link.click();
     document.body.removeChild(link);
   };
-
-  // Filter logs for Admin View
-  const filteredLogs = logs.filter((log) => {
-    const matchesSearch = viewMode === 'member' || 
-      (log.memberId?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       log.memberId?.email?.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesDate = !filterDate || log.date === filterDate;
-    return matchesSearch && matchesDate;
-  });
 
   // Calculate Statistics
   const totalCheckIns = logs.length;
@@ -181,7 +311,24 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
             </div>
           )}
           <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-slate-450" />
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Start Date:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="glass-input px-3 py-1.5 rounded-xl text-xs text-slate-700"
+            />
+            {startDate && (
+              <button 
+                onClick={() => setStartDate('')}
+                className="text-[10px] text-rose-500 font-semibold hover:underline"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Single Date:</span>
             <input
               type="date"
               value={filterDate}
@@ -266,25 +413,41 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
                     <td className="p-4 text-xs font-semibold text-slate-700">
                       {formatDateString(log.checkInTime)}
                     </td>
-                    <td className="p-4 text-xs text-slate-850 font-bold flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                      {formatTimeString(log.checkInTime)}
+                    <td className="p-4 text-xs text-slate-850 font-bold">
+                      {log.status === 'absent' ? (
+                        <span className="text-slate-400 font-mono text-[10px]">--:--</span>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          {formatTimeString(log.checkInTime)}
+                        </div>
+                      )}
                     </td>
                     <td className="p-4 text-xs text-slate-850 font-bold">
-                      {log.checkOutTime ? (
+                      {log.status === 'absent' ? (
+                        <span className="text-slate-400 font-mono text-[10px]">--:--</span>
+                      ) : log.checkOutTime ? (
                         <div className="flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                           {formatTimeString(log.checkOutTime)}
                         </div>
                       ) : (
-                        <span className="text-slate-450 font-mono text-[10px] italic">Checked In</span>
+                        <span className="text-emerald-600 font-semibold text-[10px]">OK</span>
                       )}
                     </td>
                     <td className="p-4 text-xs font-bold text-slate-650 font-mono">
-                      {calculateDuration(log.checkInTime, log.checkOutTime)}
+                      {log.status === 'absent' ? (
+                        <span className="text-slate-400 font-normal">--</span>
+                      ) : (
+                        calculateDuration(log.checkInTime, log.checkOutTime)
+                      )}
                     </td>
                     <td className="p-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 uppercase tracking-wide">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
+                        log.status === 'absent' 
+                          ? 'bg-rose-50 text-rose-600 border-rose-100' 
+                          : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                      }`}>
                         {log.status}
                       </span>
                     </td>

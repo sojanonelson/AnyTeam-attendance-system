@@ -4,7 +4,7 @@ import { QRGenerator } from '../components/QRGenerator';
 import { AttendanceReport } from '../components/AttendanceReport';
 import { 
   Users, Plus, Share2, Clipboard, Check, LogOut, 
-  Building, Key, ShieldAlert 
+  Building, Key, ShieldAlert, Calendar 
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -23,6 +23,12 @@ export const AdminDashboard: React.FC = () => {
   // Reports data
   const [logs, setLogs] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+
+  // Past Attendance marking states
+  const [pastMemberId, setPastMemberId] = useState('');
+  const [pastDate, setPastDate] = useState('');
+  const [pastLoading, setPastLoading] = useState(false);
+  const [pastAttendanceMsg, setPastAttendanceMsg] = useState({ type: '', text: '' });
 
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -130,6 +136,25 @@ export const AdminDashboard: React.FC = () => {
     setSelectedTeam(null);
     setLogs([]);
     setMembers([]);
+  };
+
+  const handleMarkMemberPastAttendance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTeam || !pastMemberId || !pastDate) return;
+    setPastLoading(true);
+    setPastAttendanceMsg({ type: '', text: '' });
+    try {
+      const res = await api.admin.markMemberPastAttendance(pastMemberId, pastDate, selectedTeam._id);
+      setPastAttendanceMsg({ type: 'success', text: res.message || 'Attendance marked successfully!' });
+      setPastMemberId('');
+      setPastDate('');
+      fetchReportData();
+      setTimeout(() => setPastAttendanceMsg({ type: '', text: '' }), 5050);
+    } catch (err: any) {
+      setPastAttendanceMsg({ type: 'error', text: err.message || 'Failed to mark attendance' });
+    } finally {
+      setPastLoading(false);
+    }
   };
 
   const copyInviteLink = () => {
@@ -375,6 +400,63 @@ export const AdminDashboard: React.FC = () => {
               <p className="text-[10px] text-slate-500 text-center leading-relaxed">
                 Send this link and join password to your team members so they can register their account.
               </p>
+            </div>
+
+            {/* Mark Past Attendance for Member */}
+            <div className="glass-panel p-5 rounded-2xl border border-slate-200 space-y-4">
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-indigo-600" />
+                Mark Past Attendance
+              </h3>
+              
+              {pastAttendanceMsg.text && (
+                <div className={`p-3 rounded-xl text-xs border font-semibold ${
+                  pastAttendanceMsg.type === 'success' 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                    : 'bg-rose-50 border-rose-200 text-rose-700'
+                }`}>
+                  {pastAttendanceMsg.text}
+                </div>
+              )}
+
+              <form onSubmit={handleMarkMemberPastAttendance} className="space-y-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Select Member</label>
+                  <select
+                    value={pastMemberId}
+                    onChange={(e) => setPastMemberId(e.target.value)}
+                    className="glass-input w-full px-3 py-2 rounded-xl text-xs text-slate-700 bg-white font-medium"
+                    required
+                  >
+                    <option value="" className="text-slate-500">-- Choose Member --</option>
+                    {members.map((m) => (
+                      <option key={m._id || m.id} value={m._id || m.id} className="text-slate-800">
+                        {m.name} ({m.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Select Date</label>
+                  <input
+                    type="date"
+                    max={new Date().toISOString().split('T')[0]}
+                    value={pastDate}
+                    onChange={(e) => setPastDate(e.target.value)}
+                    className="glass-input w-full px-3 py-2 rounded-xl text-xs text-slate-705 font-medium"
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={pastLoading || !pastMemberId || !pastDate}
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition disabled:opacity-50 active:scale-[0.98] shadow-sm"
+                >
+                  {pastLoading ? 'Marking...' : 'Mark Present'}
+                </button>
+              </form>
             </div>
           </div>
 

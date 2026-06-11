@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 // Separate token keys so admin and member can be logged in at the same time for testing!
 const TOKEN_KEYS = {
@@ -93,6 +93,12 @@ export const api = {
     getTeamMembers: (teamId: string) =>
       request<any[]>(`/admin/teams/${teamId}/members`, { method: 'GET' }, 'admin'),
 
+    markMemberPastAttendance: (memberId: string, date: string, teamId: string) =>
+      request<any>('/admin/mark-member-past-attendance', {
+        method: 'POST',
+        body: JSON.stringify({ memberId, date, teamId }),
+      }, 'admin'),
+
     system: {
       getOverview: () =>
         request<{ stats: any; teams: any[] }>('/admin/system/overview', { method: 'GET' }, 'admin'),
@@ -123,10 +129,16 @@ export const api = {
     getMe: () =>
       request<any>('/member/me', { method: 'GET' }, 'member'),
 
-    updateProfile: (payload: { name?: string; profileImage?: string }) =>
+    updateProfile: (payload: { name?: string; profileImage?: string; linkedinId?: string; status?: string }) =>
       request<any>('/member/profile', {
         method: 'PUT',
         body: JSON.stringify(payload),
+      }, 'member'),
+
+    markPastAttendance: (date: string) =>
+      request<any>('/member/mark-past-attendance', {
+        method: 'POST',
+        body: JSON.stringify({ date }),
       }, 'member'),
   },
 

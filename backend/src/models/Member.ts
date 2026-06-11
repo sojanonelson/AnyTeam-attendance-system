@@ -6,6 +6,8 @@ const MemberSchema = new Schema({
   password: { type: String, required: true }, // Encrypted
   teamId: { type: Schema.Types.ObjectId, ref: 'Team', required: true },
   profileImage: { type: String, default: '' }, // Can be base64 string or url
+  linkedinId: { type: String, default: '' },
+  status: { type: String, default: 'Available' },
   createdAt: { type: Date, default: Date.now }
 });
 
