@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL 
 
 // Separate token keys so admin and member can be logged in at the same time for testing!
 const TOKEN_KEYS = {
