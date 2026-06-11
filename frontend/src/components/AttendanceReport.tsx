@@ -296,11 +296,11 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
       </div>
 
       {/* Filters and Actions */}
-      <div className="glass-panel p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-200">
-        <div className="flex flex-wrap items-center gap-3 flex-grow">
+      <div className="glass-panel p-4 rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-slate-200">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-3 flex-grow w-full">
           {viewMode === 'admin' && (
-            <div className="relative flex-grow max-w-xs">
-              <Search className="w-4 h-4 text-slate-450 absolute left-3 top-1/2 -translate-y-1/2" />
+            <div className="relative flex-grow lg:max-w-xs">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search member name or email..."
@@ -310,55 +310,59 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
               />
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Start Date:</span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="glass-input px-3 py-1.5 rounded-xl text-xs text-slate-700"
-            />
-            {startDate && (
-              <button 
-                onClick={() => setStartDate('')}
-                className="text-[10px] text-rose-500 font-semibold hover:underline"
-              >
-                Clear
-              </button>
-            )}
+          <div className="flex items-center justify-between sm:justify-start gap-2 bg-white/50 border border-slate-200 px-3 py-1.5 rounded-xl">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0">Start Date:</span>
+            <div className="flex items-center gap-1.5 flex-grow">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent border-none outline-none text-xs text-slate-700 w-full"
+              />
+              {startDate && (
+                <button 
+                  onClick={() => setStartDate('')}
+                  className="text-[10px] text-rose-500 font-semibold hover:underline shrink-0"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Single Date:</span>
-            <input
-              type="date"
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-              className="glass-input px-3 py-1.5 rounded-xl text-xs text-slate-700"
-            />
-            {filterDate && (
-              <button 
-                onClick={() => setFilterDate('')}
-                className="text-[10px] text-rose-500 font-semibold hover:underline"
-              >
-                Clear
-              </button>
-            )}
+          <div className="flex items-center justify-between sm:justify-start gap-2 bg-white/50 border border-slate-200 px-3 py-1.5 rounded-xl">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0">Single Date:</span>
+            <div className="flex items-center gap-1.5 flex-grow">
+              <input
+                type="date"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+                className="bg-transparent border-none outline-none text-xs text-slate-700 w-full"
+              />
+              {filterDate && (
+                <button 
+                  onClick={() => setFilterDate('')}
+                  className="text-[10px] text-rose-500 font-semibold hover:underline shrink-0"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-end md:self-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0">
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-650 rounded-xl text-xs font-semibold transition"
+              className="flex-1 sm:flex-none px-3.5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-650 rounded-xl text-xs font-semibold transition text-center"
             >
-              Refresh Data
+              Refresh
             </button>
           )}
           <button
             onClick={handleExportCSV}
             disabled={filteredLogs.length === 0}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition disabled:opacity-50 active:scale-[0.98]"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition disabled:opacity-50 active:scale-[0.98]"
           >
             <ArrowDownToLine className="w-3.5 h-3.5" />
             Export CSV
@@ -368,7 +372,8 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
 
       {/* Report Log Table / List */}
       <div className="glass-panel rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
-        <div className="overflow-x-auto">
+        {/* Desktop View (Table) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
@@ -435,7 +440,7 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
                         <span className="text-emerald-600 font-semibold text-[10px]">OK</span>
                       )}
                     </td>
-                    <td className="p-4 text-xs font-bold text-slate-650 font-mono">
+                    <td className="p-4 text-xs font-bold text-slate-655 font-mono">
                       {log.status === 'absent' ? (
                         <span className="text-slate-400 font-normal">--</span>
                       ) : (
@@ -456,6 +461,74 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View (Card-based Layout) */}
+        <div className="block md:hidden divide-y divide-slate-100">
+          {filteredLogs.length === 0 ? (
+            <div className="p-8 text-center text-slate-400">
+              <FileText className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+              No attendance records found matching filters.
+            </div>
+          ) : (
+            filteredLogs.map((log) => (
+              <div key={log._id || log.id} className="p-4 space-y-3 bg-white hover:bg-slate-550/50 transition duration-150">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-800">
+                    {formatDateString(log.checkInTime)}
+                  </span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border ${
+                    log.status === 'absent' 
+                      ? 'bg-rose-50 text-rose-600 border-rose-100' 
+                      : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                  }`}>
+                    {log.status}
+                  </span>
+                </div>
+                
+                {viewMode === 'admin' && (
+                  <div className="flex items-center gap-2.5 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                    {log.memberId?.profileImage ? (
+                      <img
+                        src={log.memberId.profileImage}
+                        alt={log.memberId.name}
+                        className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-indigo-50 border border-slate-200 flex items-center justify-center text-xs font-bold text-indigo-650">
+                        {log.memberId?.name ? log.memberId.name.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-xs font-bold text-slate-805">{log.memberId?.name || 'Unknown'}</p>
+                      <p className="text-[10px] text-slate-500">{log.memberId?.email || 'N/A'}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">In</span>
+                    <span className="font-bold text-slate-800 font-mono">
+                      {log.status === 'absent' ? '--:--' : formatTimeString(log.checkInTime)}
+                    </span>
+                  </div>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Out</span>
+                    <span className="font-bold text-slate-805 font-mono">
+                      {log.status === 'absent' ? '--:--' : (log.checkOutTime ? formatTimeString(log.checkOutTime) : 'OK')}
+                    </span>
+                  </div>
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Hours</span>
+                    <span className="font-bold text-indigo-600 font-mono">
+                      {log.status === 'absent' ? '--' : calculateDuration(log.checkInTime, log.checkOutTime)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
