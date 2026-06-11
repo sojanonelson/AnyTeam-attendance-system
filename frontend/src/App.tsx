@@ -97,7 +97,7 @@ function App() {
 
       {/* Footer */}
       <footer className="py-6 border-t border-slate-200 bg-white/50 text-center text-xs text-slate-400 mt-auto">
-        <p>Anyteam Attendance System © 2026 • Clean White Theme • Powered by React & MongoDB • Software Team Webyfy IoT Pvt Ltd</p>
+        <p>Anyteam Attendance System © 2026  • Software Team Webyfy IoT Pvt Ltd</p>
       </footer>
     </div>
   );
