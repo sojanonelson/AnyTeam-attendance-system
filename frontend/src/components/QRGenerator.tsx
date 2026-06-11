@@ -142,7 +142,7 @@ export const QRGenerator: React.FC<QRGeneratorProps> = ({ teamId, onTokenChange 
               ) : (
                 <>
                   <Copy className="w-3.5 h-3.5" />
-                  <span>Copy QR Token (For Demo)</span>
+                  <span>Copy QR Token </span>
                 </>
               )}
             </button>
