@@ -151,7 +151,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res) => {
       return res.status(403).json({ message: 'Access denied: not a member' });
     }
 
-    const member = await Member.findById(req.user.id).select('-password');
+    const member = await Member.findById(req.user.id).select('-password').populate('teamId', 'name');
     if (!member) {
       return res.status(404).json({ message: 'Member not found' });
     }

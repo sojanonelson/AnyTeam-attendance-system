@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import AttendanceLog from '../models/AttendanceLog';
 import Team from '../models/Team';
+import Member from '../models/Member';
+import { sendCheckInEmail } from '../services/emailService';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkeyforattendanceappqr2026';
@@ -92,6 +94,21 @@ router.post('/verify', authMiddleware, async (req: AuthRequest, res) => {
         status: 'present'
       });
       await log.save();
+
+      // Send check-in email notification asynchronously (non-blocking)
+      try {
+        const member = await Member.findById(memberId);
+        if (member && member.email) {
+          sendCheckInEmail(member.email, member.name).catch((err) => {
+            console.error('[QR Route] Error sending check-in email in background:', err);
+          });
+        } else {
+          console.warn(`[QR Route] Member not found or email missing for member ID: ${memberId}`);
+        }
+      } catch (emailErr) {
+        console.error('[QR Route] Error retrieving member info for check-in email:', emailErr);
+      }
+
       return res.status(201).json({
         action: 'check-in',
         time: now,

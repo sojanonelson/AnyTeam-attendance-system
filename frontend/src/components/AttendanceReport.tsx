@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, User, Clock, ArrowDownToLine, Search, UserCheck, UserX, FileText } from 'lucide-react';
 
 interface AttendanceReportProps {
@@ -19,6 +19,13 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [startDate, setStartDate] = useState('');
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterDate, startDate]);
 
   // Calculate working hours helper
   const calculateDuration = (checkIn: string, checkOut: string | null): string => {
@@ -177,6 +184,12 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
     const matchesStartDate = !startDate || log.date >= startDate;
     return matchesSearch && matchesSingleDate && matchesStartDate;
   });
+
+  // Paginated Logs
+  const indexOfLastLog = currentPage * itemsPerPage;
+  const indexOfFirstLog = indexOfLastLog - itemsPerPage;
+  const currentLogs = filteredLogs.slice(indexOfFirstLog, indexOfLastLog);
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
 
   // Export to CSV Helper
   const handleExportCSV = () => {
@@ -394,7 +407,7 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => (
+                currentLogs.map((log) => (
                   <tr key={log._id || log.id} className="hover:bg-slate-50/50 transition duration-150">
                     {viewMode === 'admin' && (
                       <td className="p-4 flex items-center gap-2.5">
@@ -471,7 +484,7 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
               No attendance records found matching filters.
             </div>
           ) : (
-            filteredLogs.map((log) => (
+            currentLogs.map((log) => (
               <div key={log._id || log.id} className="p-4 space-y-3 bg-white hover:bg-slate-550/50 transition duration-150">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-slate-800">
@@ -530,6 +543,75 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
             ))
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-slate-200 sm:px-6">
+            <div className="flex justify-between flex-1 sm:hidden">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="relative inline-flex items-center px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span className="text-xs text-slate-700 flex items-center">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="relative inline-flex items-center px-4 py-2 ml-3 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs text-slate-700">
+                  Showing <span className="font-semibold">{indexOfFirstLog + 1}</span> to <span className="font-semibold">{Math.min(indexOfLastLog, filteredLogs.length)}</span> of{' '}
+                  <span className="font-semibold">{filteredLogs.length}</span> entries
+                </p>
+              </div>
+              <div>
+                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-2.5 py-1.5 rounded-l-md border border-slate-300 bg-white text-xs font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+                  >
+                    First
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-2.5 py-1.5 border border-slate-300 bg-white text-xs font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+                  >
+                    Prev
+                  </button>
+                  <span className="relative inline-flex items-center px-4 py-1.5 border border-slate-300 bg-indigo-50 text-xs font-semibold text-indigo-600">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="relative inline-flex items-center px-2.5 py-1.5 border border-slate-300 bg-white text-xs font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+                  >
+                    Next
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="relative inline-flex items-center px-2.5 py-1.5 rounded-r-md border border-slate-300 bg-white text-xs font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+                  >
+                    Last
+                  </button>
+                </nav>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

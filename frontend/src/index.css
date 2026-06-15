@@ -117,3 +117,68 @@ body {
 #qr-reader__dashboard_section_csr button:hover {
   background-color: #4338ca !important;
 }
+
+/* Custom CSS Print Media Queries */
+@media print {
+  /* Hide headers, footers, dashboards, and all non-print elements */
+  header,
+  footer,
+  button,
+  select,
+  input,
+  nav,
+  .print\:hidden,
+  aside {
+    display: none !important;
+  }
+
+  /* Reset main layouts and backgrounds */
+  body, html {
+    background: #ffffff !important;
+    background-image: none !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Layout rules for printing tables and grids */
+  .grid, .flex {
+    display: block !important;
+  }
+
+  .glass-panel {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  /* Page size orientation setting */
+  @page {
+    margin: 10mm;
+  }
+
+  /* Make sure printing tables are fully visible and readable */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  
+  th, td {
+    border: 1px solid #cbd5e1 !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+  }
+}

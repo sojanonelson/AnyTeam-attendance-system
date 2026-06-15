@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { api } from '../utils/api';
-import { Camera, AlertCircle, CheckCircle, RefreshCw, X, ShieldAlert } from 'lucide-react';
+import { Camera, AlertCircle, CheckCircle, RefreshCw, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface QRScannerProps {
   onSuccess?: (result: { action: 'check-in' | 'check-out'; time: string; message: string }) => void;
@@ -11,7 +12,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
   const [scanResult, setScanResult] = useState<any>(null);
   const [error, setError] = useState<string>('');
   const [isScanning, setIsScanning] = useState<boolean>(false);
-  const [simToken, setSimToken] = useState<string>('');
+  const [isInitializing, setIsInitializing] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
   const qrReaderRef = useRef<Html5Qrcode | null>(null);
@@ -21,6 +22,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
   const startScanner = async () => {
     setError('');
     setScanResult(null);
+    setIsInitializing(true);
     setIsScanning(true);
 
     try {
@@ -47,31 +49,22 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
               });
 
               if (backCameras.length > 0) {
-                // Score back cameras to find the 1x main camera
-                // Standard main back cameras on iOS/Android often contain:
-                // "wide" (but NOT "ultra wide"), "main", "primary", "1x", or just "back camera"
-                // Ultra-wide camera labels contain: "ultra", "wide angle" (sometimes), "0.5x", "0.6x", "tele" (telephoto)
                 const scoredCameras = backCameras.map(cam => {
                   const label = cam.label.toLowerCase();
                   let score = 0;
 
-                  // High preference for primary, main, 1x
                   if (label.includes('main') || label.includes('primary') || label.includes('1x') || label.includes('camera 0')) {
                     score += 15;
                   }
 
-                  // Moderate preference for "wide" (as in "Back Wide Camera" on iOS, which is the 1x lens)
-                  // But exclude if it's "ultra wide"
                   if (label.includes('wide') && !label.includes('ultra')) {
                     score += 10;
                   }
 
-                  // Heavy penalty for ultra-wide, 0.5x zoom, etc.
                   if (label.includes('ultra') || label.includes('0.5') || label.includes('0.6') || label.includes('0.7') || label.includes('wide angle')) {
                     score -= 30;
                   }
 
-                  // Moderate penalty for telephoto or high zoom (e.g. 2x, 3x, 5x, tele)
                   if (label.includes('tele') || label.includes('zoom') || label.includes('2x') || label.includes('3x') || label.includes('5x')) {
                     score -= 15;
                   }
@@ -79,14 +72,9 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
                   return { camera: cam, score };
                 });
 
-                // Sort descending by score
                 scoredCameras.sort((a, b) => b.score - a.score);
-                console.log('Scored back cameras:', scoredCameras);
-
-                // Use the highest scored camera
                 cameraIdOrConstraint = scoredCameras[0].camera.id;
               } else {
-                // Fallback to first camera if no specific back camera identified
                 cameraIdOrConstraint = devices[0].id;
               }
             }
@@ -112,21 +100,25 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
               // Verbose scanning error, can be ignored
             }
           );
+          setIsInitializing(false);
         } catch (err: any) {
           console.error('Failed to start scanner:', err);
-          setError('Camera permission denied or camera not found. Please try pasting the QR token instead.');
+          setError('Camera permission denied or camera not found.');
           setIsScanning(false);
+          setIsInitializing(false);
         }
       }, 100);
 
     } catch (err: any) {
       setError('Could not access camera: ' + err.message);
       setIsScanning(false);
+      setIsInitializing(false);
     }
   };
 
   // Stop Scanner
   const stopScanner = async () => {
+    setIsInitializing(false);
     if (qrReaderRef.current && qrReaderRef.current.isScanning) {
       try {
         await qrReaderRef.current.stop();
@@ -153,21 +145,23 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
     try {
       const res = await api.qr.verifyToken(tokenStr);
       setScanResult(res);
+      
+      // Trigger haptic vibration feedback (single short pulse on success)
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(200);
+      }
+      
       if (onSuccess) onSuccess(res);
     } catch (err: any) {
       setError(err.message || 'QR Verification failed');
+      
+      // Trigger error vibration feedback (double short pulse on failure)
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([100, 80, 100]);
+      }
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSimSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!simToken.trim()) {
-      setError('Please paste a valid QR token first.');
-      return;
-    }
-    handleVerifyToken(simToken.trim());
   };
 
   return (
@@ -180,40 +174,56 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
         Scan QR Attendance
       </h3>
 
-      {/* Camera Scanning View */}
-      {isScanning && (
-        <div className="relative bg-slate-950 rounded-xl overflow-hidden border border-slate-700 aspect-square mb-6">
-          <style dangerouslySetInnerHTML={{__html: `
-            #${scannerId} {
-              border: none !important;
-              width: 100% !important;
-              height: 100% !important;
-            }
-            #${scannerId} video {
-              width: 100% !important;
-              height: 100% !important;
-              object-fit: cover !important;
-              border-radius: 12px !important;
-            }
-            #${scannerId} canvas {
-              display: none !important;
-            }
-          `}} />
-          <div id={scannerId} className="w-full h-full"></div>
-          
-          <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 aspect-square border-2 border-dashed border-indigo-500/50 pointer-events-none rounded-lg flex items-center justify-center">
-            <div className="scan-laser absolute inset-x-0 top-0"></div>
-          </div>
-
-          <button
-            onClick={stopScanner}
-            className="absolute top-3 right-3 p-2 bg-white/90 hover:bg-white text-slate-700 rounded-full transition shadow z-10"
-            title="Cancel Scanning"
+      {/* Camera Scanning View with Framer Motion AnimatePresence */}
+      <AnimatePresence>
+        {isScanning && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -15 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+            className="relative bg-slate-950 rounded-xl overflow-hidden border border-slate-700 aspect-square mb-6 shadow-2xl origin-center"
           >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+            <style dangerouslySetInnerHTML={{__html: `
+              #${scannerId} {
+                border: none !important;
+                width: 100% !important;
+                height: 100% !important;
+              }
+              #${scannerId} video {
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: cover !important;
+                border-radius: 12px !important;
+              }
+              #${scannerId} canvas {
+                display: none !important;
+              }
+            `}} />
+            <div id={scannerId} className="w-full h-full"></div>
+            
+            {/* Guide overlay with illuminated corners */}
+            <div className="absolute inset-8 border border-white/5 pointer-events-none rounded-xl flex items-center justify-center">
+              {/* Animated scanning laser */}
+              <div className="scan-laser absolute inset-x-0 top-0 shadow-[0_0_8px_rgba(99,102,241,0.8)]"></div>
+              
+              {/* Corner brackets */}
+              <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-indigo-500 rounded-tl-md"></div>
+              <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-indigo-500 rounded-tr-md"></div>
+              <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-indigo-500 rounded-bl-md"></div>
+              <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-indigo-500 rounded-br-md"></div>
+            </div>
+
+            <button
+              onClick={stopScanner}
+              className="absolute top-3 right-3 p-2 bg-white/95 hover:bg-white text-slate-700 rounded-full transition shadow z-10 cursor-pointer"
+              title="Cancel Scanning"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Status displays */}
       {loading && (
@@ -230,10 +240,29 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
           <p className="text-xs text-emerald-600/80 mt-1">
             Recorded at {new Date(scanResult.time).toLocaleTimeString()}
           </p>
-          <div className="mt-4 flex justify-center gap-2">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 uppercase tracking-wide">
+          <div className="mt-4 flex flex-wrap justify-center items-center gap-2">
+            <span className="inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-700 uppercase tracking-wide">
               {scanResult.action} Complete
             </span>
+            <button
+              onClick={() => {
+                if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                  navigator.vibrate(200);
+                }
+              }}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition cursor-pointer active:scale-95"
+            >
+              Test Haptic Vibration
+            </button>
+            <button
+              onClick={() => {
+                setScanResult(null);
+                setError('');
+              }}
+              className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer active:scale-95 shadow-sm"
+            >
+              Scan Again
+            </button>
           </div>
         </div>
       )}
@@ -247,47 +276,45 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
       )}
 
       {/* Action Buttons */}
-      {!isScanning && !loading && (
+      {(!isScanning || isInitializing) && !loading && (
         <div className="space-y-4">
-          <button
+          <motion.button
+            whileHover={!isInitializing ? { scale: 1.02, backgroundColor: '#4338ca' } : {}}
+            whileTap={!isInitializing ? { scale: 0.95 } : {}}
+            disabled={isInitializing}
             onClick={startScanner}
-            className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition active:scale-[0.98] shadow-md shadow-indigo-600/10"
+            className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-indigo-600 text-white rounded-xl font-bold shadow-md shadow-indigo-600/10 cursor-pointer disabled:cursor-not-allowed disabled:bg-indigo-500"
           >
-            <Camera className="w-5 h-5" />
-            Start Camera Scan
-          </button>
+            <AnimatePresence mode="wait">
+              {isInitializing ? (
+                <motion.div
+                  key="initializing"
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.15 }}
+                  className="flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  <span>Initializing Camera...</span>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="start"
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.15 }}
+                  className="flex items-center justify-center gap-2"
+                >
+                  <Camera className="w-5 h-5" />
+                  <span>Start Camera Scan</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.button>
 
-          <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-slate-200"></div>
-            <span className="flex-shrink mx-3 text-xs text-slate-400 uppercase tracking-widest font-bold">OR SIMULATE</span>
-            <div className="flex-grow border-t border-slate-200"></div>
-          </div>
-
-          {/* Simulation Input */}
-          <form onSubmit={handleSimSubmit} className="space-y-2.5">
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Paste QR Token for Desktop Testing
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={simToken}
-                onChange={(e) => setSimToken(e.target.value)}
-                placeholder="Paste token copied from Admin view..."
-                className="glass-input flex-grow px-3 py-2 rounded-xl text-sm font-mono text-slate-700 placeholder:text-slate-400"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-xl text-sm font-bold transition active:scale-[0.98]"
-              >
-                Mark
-              </button>
-            </div>
-            <p className="text-[10px] text-slate-500 leading-relaxed flex items-start gap-1">
-              <ShieldAlert className="w-3.5 h-3.5 text-indigo-600 shrink-0 mt-0.5" />
-              This simulates scanning the rotated QR code displayed on the Admin's projection screen. Perfect for testing without a webcam.
-            </p>
-          </form>
+         
         </div>
       )}
     </div>
