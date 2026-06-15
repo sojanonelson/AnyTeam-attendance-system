@@ -11,9 +11,13 @@ import {
 
 interface MemberPortalProps {
   prefilledInviteCode?: string;
+  initialTab?: 'scan' | 'logs' | 'report' | 'profile';
 }
 
-export const MemberPortal: React.FC<MemberPortalProps> = ({ prefilledInviteCode = '' }) => {
+export const MemberPortal: React.FC<MemberPortalProps> = ({ 
+  prefilledInviteCode = '',
+  initialTab
+}) => {
   const [memberUser, setMemberUser] = useState<any>(null);
   
   // Auth Form State
@@ -40,7 +44,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ prefilledInviteCode 
   // History & Status
   const [logs, setLogs] = useState<any[]>([]);
   const [todayStatus, setTodayStatus] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'scan' | 'logs' | 'report' | 'profile'>('scan');
+  const [activeTab, setActiveTab] = useState<'scan' | 'logs' | 'report' | 'profile'>(initialTab || 'scan');
 
   // Validation state for password
   const [pwdValidations, setPwdValidations] = useState({
@@ -55,8 +59,11 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({ prefilledInviteCode 
     if (user) {
       setMemberUser(user);
       fetchHistoryAndProfile();
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
     }
-  }, []);
+  }, [initialTab]);
 
   // Update password validation rules when password changes
   useEffect(() => {

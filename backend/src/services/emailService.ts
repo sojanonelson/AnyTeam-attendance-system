@@ -3,7 +3,9 @@ dotenv.config();
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || 're_AusrQFcF_E5gfZ55ocLrLdpgNBSEjF33L';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-const DISABLE_EMAIL_SERVICE = true; // Set to false to enable actual Resend platform sending
+const DISABLE_EMAIL_SERVICE = process.env.DISABLE_EMAIL_SERVICE !== 'false'; // defaults to true (disabled) unless explicitly set to 'false'
+const IS_SANDBOX_MODE = process.env.IS_SANDBOX_MODE !== 'false'; // defaults to true (sandbox mode) unless explicitly set to 'false'
+const SENDER_EMAIL = process.env.SENDER_EMAIL || 'AnyTeam Attendance <onboarding@resend.dev>';
 
 /**
  * Sends a check-in confirmation email to the member using the Resend platform API.
@@ -27,7 +29,7 @@ export async function sendCheckInEmail(memberEmail: string, memberName: string):
   let testNoticeHtml = '';
 
   // Resend sandbox key only allows sending to the owner: sojanonelson54@gmail.com
-  if (memberEmail.toLowerCase() !== 'sojanonelson54@gmail.com') {
+  if (IS_SANDBOX_MODE && memberEmail.toLowerCase() !== 'sojanonelson54@gmail.com') {
     finalRecipient = 'sojanonelson54@gmail.com';
     subjectPrefix = `[Test for ${memberName}] `;
     testNoticeHtml = `
@@ -41,7 +43,7 @@ export async function sendCheckInEmail(memberEmail: string, memberName: string):
 
   try {
     const payload = {
-      from: 'AnyTeam Attendance <onboarding@resend.dev>',
+      from: SENDER_EMAIL,
       to: finalRecipient,
       subject: `${subjectPrefix}${memberName}, Check-In Successful!`,
       html: `
@@ -129,7 +131,7 @@ export async function sendCheckInEmail(memberEmail: string, memberName: string):
               <p>Your attendance check-in has been successfully recorded for today.</p>
               <p>Keep up the great work! You can view your detailed logs and download your certificates directly from your attendance portal.</p>
               <div class="button-container">
-                <a href="${FRONTEND_URL}" class="btn">view your attendance report</a>
+                <a href="${FRONTEND_URL}/?view=member&tab=report" class="btn">view your attendance report</a>
               </div>
               <p style="margin-bottom: 0;">Best regards,<br><strong>AnyTeam Admin Team</strong></p>
             </div>
@@ -183,7 +185,7 @@ export async function sendTestEmail(adminEmail: string, adminUsername: string): 
   let subjectPrefix = '';
   let testNoticeHtml = '';
 
-  if (adminEmail.toLowerCase() !== 'sojanonelson54@gmail.com') {
+  if (IS_SANDBOX_MODE && adminEmail.toLowerCase() !== 'sojanonelson54@gmail.com') {
     finalRecipient = 'sojanonelson54@gmail.com';
     subjectPrefix = `[Test for Admin: ${adminUsername}] `;
     testNoticeHtml = `
@@ -197,7 +199,7 @@ export async function sendTestEmail(adminEmail: string, adminUsername: string): 
 
   try {
     const payload = {
-      from: 'AnyTeam Attendance <onboarding@resend.dev>',
+      from: SENDER_EMAIL,
       to: finalRecipient,
       subject: `${subjectPrefix}Test Email Service - ${adminUsername}`,
       html: `

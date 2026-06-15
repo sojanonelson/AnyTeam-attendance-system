@@ -10,16 +10,39 @@ import {
 function App() {
   const [activeView, setActiveView] = useState<'system' | 'admin' | 'member'>('admin');
   const [prefilledInvite, setPrefilledInvite] = useState<string>('');
+  const [initialTab, setInitialTab] = useState<'scan' | 'logs' | 'report' | 'profile' | undefined>(undefined);
 
-  // Parse invite code from URL query parameters (e.g. ?join=ABCDEF)
+  // Parse query parameters from URL (e.g. ?join=ABCDEF or ?view=member&tab=report)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const joinCode = params.get('join');
+    const viewParam = params.get('view');
+    const tabParam = params.get('tab');
+
+    let shouldCleanUrl = false;
+
     if (joinCode) {
       setPrefilledInvite(joinCode.toUpperCase());
       setActiveView('member'); // Automatically switch to member view to sign up
-      
-      // Clean query parameter from URL without page reload
+      shouldCleanUrl = true;
+    }
+
+    if (viewParam === 'member' || viewParam === 'admin' || viewParam === 'system') {
+      setActiveView(viewParam as 'member' | 'admin' | 'system');
+      shouldCleanUrl = true;
+    }
+
+    if (tabParam === 'scan' || tabParam === 'logs' || tabParam === 'report' || tabParam === 'profile') {
+      setInitialTab(tabParam as 'scan' | 'logs' | 'report' | 'profile');
+      // If tab is set, also default to member view if view is not explicitly set
+      if (!viewParam) {
+        setActiveView('member');
+      }
+      shouldCleanUrl = true;
+    }
+
+    if (shouldCleanUrl) {
+      // Clean query parameters from URL without page reload
       const newUrl = window.location.origin + window.location.pathname;
       window.history.replaceState({}, document.title, newUrl);
     }
@@ -90,7 +113,7 @@ function App() {
 
         {activeView === 'member' && (
           <div className="w-full max-w-7xl mx-auto px-4 animate-fadeIn">
-            <MemberPortal prefilledInviteCode={prefilledInvite} />
+            <MemberPortal prefilledInviteCode={prefilledInvite} initialTab={initialTab} />
           </div>
         )}
       </main>
