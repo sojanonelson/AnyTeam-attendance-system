@@ -249,28 +249,29 @@ router.post('/mark-member-past-attendance', authMiddleware, async (req: AuthRequ
   }
 });
 
-// Test Email Service: Send a test email to the logged in Admin's email (username)
+// Test Email Service: Send a test email to the logged in Admin's email (username) or custom email
 router.post('/test-email', authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (req.user?.role !== 'team_admin' && req.user?.role !== 'system_admin') {
       return res.status(403).json({ message: 'Access denied: admins only' });
     }
 
+    const { email } = req.body;
     const adminId = req.user?.id;
     const admin = await Admin.findById(adminId);
     if (!admin) {
       return res.status(404).json({ message: 'Admin user not found' });
     }
 
-    const adminEmail = admin.username;
+    const adminEmail = email || admin.username;
     if (!adminEmail || !adminEmail.includes('@')) {
       return res.status(400).json({ 
-        message: 'Invalid admin username. Admin username must be a valid email address to send a test mail.' 
+        message: 'Invalid email address. Please provide a valid email to send a test mail.' 
       });
     }
 
     const result = await sendTestEmail(adminEmail, admin.username);
-    res.json({ message: `Test email sent successfully to ${admin.username}!`, details: result });
+    res.json({ message: `Test email sent successfully to ${adminEmail}!`, details: result });
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Error sending test email' });
   }

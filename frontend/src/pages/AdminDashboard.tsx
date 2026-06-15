@@ -172,7 +172,7 @@ export const AdminDashboard: React.FC = () => {
     setTestMailLoading(true);
     setTestMailMsg({ type: '', text: '' });
     try {
-      const res = await api.admin.testEmail();
+      const res = await api.admin.testEmail('sojanonelson54@gmail.com');
       setTestMailMsg({ type: 'success', text: res.message || 'Test email sent successfully!' });
       setTimeout(() => setTestMailMsg({ type: '', text: '' }), 5000);
     } catch (err: any) {
@@ -641,7 +641,7 @@ export const AdminDashboard: React.FC = () => {
                     <div className="space-y-1">
                       <p className="text-xs font-bold text-slate-700">Test Email Delivery</p>
                       <p className="text-[11px] text-slate-500 max-w-md">
-                        Sends a test check-in notification email to <span className="font-semibold text-slate-700">{adminUser.username}</span> to verify that your Resend API configuration is active and working.
+                        Sends a test check-in notification email to <span className="font-semibold text-slate-700">sojanonelson54@gmail.com</span> to verify that your Resend API configuration is active and working.
                       </p>
                     </div>
                     

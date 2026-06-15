@@ -99,9 +99,10 @@ export const api = {
         body: JSON.stringify({ memberId, date, teamId }),
       }, 'admin'),
 
-    testEmail: () =>
+    testEmail: (email?: string) =>
       request<any>('/admin/test-email', {
         method: 'POST',
+        body: JSON.stringify({ email }),
       }, 'admin'),
 
     system: {
