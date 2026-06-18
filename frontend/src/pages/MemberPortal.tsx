@@ -583,6 +583,20 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({
                           );
                         })}
                       </div>
+                    ) : q.questionType === 'dropdown' ? (
+                      <select
+                        value={answers[q.questionText] || ''}
+                        onChange={(e) => setAnswers(prev => ({ ...prev, [q.questionText]: e.target.value }))}
+                        className="glass-input w-full px-3.5 py-2.5 rounded-xl text-xs bg-white cursor-pointer font-medium text-slate-700"
+                        required
+                      >
+                        <option value="" className="text-slate-400">-- Select Option --</option>
+                        {q.options && q.options.map((opt: string, optIdx: number) => (
+                          <option key={optIdx} value={opt} className="text-slate-800">
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
                     ) : (
                       <textarea
                         value={answers[q.questionText] || ''}

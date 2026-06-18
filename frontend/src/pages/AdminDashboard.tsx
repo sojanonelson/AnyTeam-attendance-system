@@ -113,9 +113,16 @@ export const AdminDashboard: React.FC = () => {
     setQuestionsLoading(true);
     setQuestionsMsg({ type: '', text: '' });
 
-    const invalid = localQuestions.some(q => !q.questionText.trim());
-    if (invalid) {
+    const invalidText = localQuestions.some(q => !q.questionText.trim());
+    if (invalidText) {
       setQuestionsMsg({ type: 'error', text: 'All questions must have question text.' });
+      setQuestionsLoading(false);
+      return;
+    }
+
+    const invalidDropdown = localQuestions.some(q => q.questionType === 'dropdown' && (!q.options || q.options.filter((opt: string) => opt.trim()).length === 0));
+    if (invalidDropdown) {
+      setQuestionsMsg({ type: 'error', text: 'All dropdown questions must have at least one option configured.' });
       setQuestionsLoading(false);
       return;
     }
@@ -1191,6 +1198,7 @@ export const AdminDashboard: React.FC = () => {
                           >
                             <option value="short_answer">Short Answer (Text)</option>
                             <option value="rating">Rating (1 to 5)</option>
+                            <option value="dropdown">Dropdown Options</option>
                           </select>
                         </div>
                       </div>
@@ -1199,6 +1207,25 @@ export const AdminDashboard: React.FC = () => {
                         <div className="text-[10px] text-slate-505 font-semibold bg-white border border-slate-150 px-3 py-2 rounded-xl w-fit flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                           <span>Predefined rating buttons (1, 2, 3, 4, 5) will be shown to members.</span>
+                        </div>
+                      )}
+
+                      {q.questionType === 'dropdown' && (
+                        <div className="space-y-1.5 text-left">
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                            Dropdown Options (separated by commas)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Sales, Marketing, Engineering, Support"
+                            value={q.options ? q.options.join(', ') : ''}
+                            onChange={(e) => {
+                              const opts = e.target.value.split(',').map(s => s.trim());
+                              handleUpdateQuestion(idx, 'options', opts);
+                            }}
+                            className="glass-input w-full px-3.5 py-2.5 rounded-xl text-xs bg-white"
+                            required
+                          />
                         </div>
                       )}
                     </div>

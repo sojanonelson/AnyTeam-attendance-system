@@ -8,7 +8,7 @@ const TeamSchema = new Schema({
   checkInQuestions: {
     type: [{
       questionText: { type: String, required: true },
-      questionType: { type: String, enum: ['rating', 'short_answer'], default: 'short_answer' },
+      questionType: { type: String, enum: ['rating', 'short_answer', 'dropdown'], default: 'short_answer' },
       options: [String]
     }],
     default: []
