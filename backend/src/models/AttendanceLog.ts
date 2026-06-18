@@ -7,6 +7,13 @@ const AttendanceLogSchema = new Schema({
   checkInTime: { type: Date, required: true },
   checkOutTime: { type: Date, default: null }, // Null if not checked out yet
   status: { type: String, enum: ['present', 'absent'], default: 'present' },
+  checkInAnswers: {
+    type: [{
+      questionText: { type: String, required: true },
+      answer: { type: String, required: true }
+    }],
+    default: []
+  },
   createdAt: { type: Date, default: Date.now }
 });
 

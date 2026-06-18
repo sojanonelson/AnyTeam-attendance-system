@@ -83,38 +83,54 @@ router.post('/verify', authMiddleware, async (req: AuthRequest, res) => {
     // Find if a log already exists for today
     let log = await AttendanceLog.findOne({ memberId, teamId: memberTeamId, date: todayStr });
 
+    // Fetch team questions details to determine status and check-out block
+    const team = await Team.findById(memberTeamId);
+    const hasQuestions = team && team.checkInQuestions && team.checkInQuestions.length > 0;
+
     if (!log) {
       // Create Check-in (Login)
+      // If team has check-in questions, set status to 'absent' initially (pending answers)
       log = new AttendanceLog({
         memberId,
         teamId: memberTeamId,
         date: todayStr,
         checkInTime: now,
         checkOutTime: null,
-        status: 'present'
+        status: hasQuestions ? 'absent' : 'present'
       });
       await log.save();
 
-      // Send check-in email notification asynchronously (non-blocking)
-      try {
-        const member = await Member.findById(memberId);
-        if (member && member.email) {
-          sendCheckInEmail(member.email, member.name).catch((err) => {
-            console.error('[QR Route] Error sending check-in email in background:', err);
-          });
-        } else {
-          console.warn(`[QR Route] Member not found or email missing for member ID: ${memberId}`);
+      // Only send check-in email immediately if there are NO questions
+      if (!hasQuestions) {
+        try {
+          const member = await Member.findById(memberId);
+          if (member && member.email) {
+            sendCheckInEmail(member.email, member.name).catch((err) => {
+              console.error('[QR Route] Error sending check-in email in background:', err);
+            });
+          } else {
+            console.warn(`[QR Route] Member not found or email missing for member ID: ${memberId}`);
+          }
+        } catch (emailErr) {
+          console.error('[QR Route] Error retrieving member info for check-in email:', emailErr);
         }
-      } catch (emailErr) {
-        console.error('[QR Route] Error retrieving member info for check-in email:', emailErr);
       }
 
       return res.status(201).json({
         action: 'check-in',
         time: now,
-        message: 'Checked-in successfully!'
+        message: hasQuestions ? 'Check-in recorded. Please complete questionnaire.' : 'Checked-in successfully!',
+        hasQuestions: !!hasQuestions
       });
     } else {
+      // If the team has questions and the member hasn't answered them, block check-out
+      const hasAnswered = log.checkInAnswers && log.checkInAnswers.length > 0;
+      if (hasQuestions && !hasAnswered) {
+        return res.status(400).json({
+          message: "You must answer today's check-in questions before you can check out."
+        });
+      }
+
       // Already checked in, handle Check-out (Logoff)
       if (log.checkOutTime) {
         return res.status(400).json({

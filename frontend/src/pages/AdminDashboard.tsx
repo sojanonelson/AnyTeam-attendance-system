@@ -6,7 +6,7 @@ import { IndividualReport } from '../components/IndividualReport';
 import { 
   Users, Plus, Share2, Clipboard, Check, LogOut, 
   Building, Key, ShieldAlert, Calendar, FileText, Printer, User, ArrowRight,
-  Mail, Send
+  Mail, Send, Trash2, Save, HelpCircle, Search
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -27,8 +27,17 @@ export const AdminDashboard: React.FC = () => {
   const [members, setMembers] = useState<any[]>([]);
 
   // Tab State & Selected Member for Detail View
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'logs' | 'individual' | 'summary'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'logs' | 'individual' | 'summary' | 'questions' | 'responses'>('dashboard');
   const [selectedMember, setSelectedMember] = useState<any>(null);
+  
+  // Responses tab filters state
+  const [searchTermResponses, setSearchTermResponses] = useState('');
+  const [filterDateResponses, setFilterDateResponses] = useState('');
+
+  // Check-in Questions states
+  const [localQuestions, setLocalQuestions] = useState<any[]>([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [questionsMsg, setQuestionsMsg] = useState({ type: '', text: '' });
 
   // Past Attendance marking states
   const [pastMemberId, setPastMemberId] = useState('');
@@ -59,6 +68,74 @@ export const AdminDashboard: React.FC = () => {
       setSelectedMember(null); // Reset detail view on team change
     }
   }, [selectedTeam]);
+
+  // Sync questions state
+  useEffect(() => {
+    if (selectedTeam) {
+      setLocalQuestions(selectedTeam.checkInQuestions || []);
+    }
+  }, [selectedTeam, activeTab]);
+
+  const handleAddQuestion = () => {
+    setLocalQuestions(prev => [
+      ...prev,
+      {
+        questionText: '',
+        questionType: 'short_answer',
+        options: []
+      }
+    ]);
+  };
+
+  const handleDeleteQuestion = (index: number) => {
+    setLocalQuestions(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleUpdateQuestion = (index: number, field: string, value: any) => {
+    setLocalQuestions(prev => prev.map((q, idx) => {
+      if (idx === index) {
+        const updated = { ...q, [field]: value };
+        if (field === 'questionType') {
+          if (value === 'rating') {
+            updated.options = ['1', '2', '3', '4', '5'];
+          } else {
+            updated.options = [];
+          }
+        }
+        return updated;
+      }
+      return q;
+    }));
+  };
+
+  const handleSaveQuestions = async () => {
+    if (!selectedTeam) return;
+    setQuestionsLoading(true);
+    setQuestionsMsg({ type: '', text: '' });
+
+    const invalid = localQuestions.some(q => !q.questionText.trim());
+    if (invalid) {
+      setQuestionsMsg({ type: 'error', text: 'All questions must have question text.' });
+      setQuestionsLoading(false);
+      return;
+    }
+
+    try {
+      const res = await api.admin.updateTeamQuestions(selectedTeam._id, localQuestions);
+      setQuestionsMsg({ type: 'success', text: 'Check-in questions saved successfully!' });
+      
+      // Update team state in dashboard
+      setSelectedTeam(res.team);
+      // Update in teams list
+      setTeams(prev => prev.map(t => t._id === res.team._id ? res.team : t));
+      
+      setTimeout(() => setQuestionsMsg({ type: '', text: '' }), 3000);
+    } catch (err: any) {
+      setQuestionsMsg({ type: 'error', text: err.message || 'Failed to save check-in questions' });
+    } finally {
+      setQuestionsLoading(false);
+    }
+  };
 
   const fetchTeams = async () => {
     try {
@@ -442,6 +519,23 @@ export const AdminDashboard: React.FC = () => {
             className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${activeTab === 'summary' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
           >
             Team Summary PDF
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('responses');
+              fetchReportData();
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${activeTab === 'responses' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            Question Responses
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('questions');
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${activeTab === 'questions' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            Check-in Questions
           </button>
         </div>
       )}
@@ -891,6 +985,238 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
+            </div>
+          )}
+          {/* TAB: QUESTION RESPONSES DISPLAY */}
+          {activeTab === 'responses' && (
+            <div className="glass-panel p-6 rounded-2xl border border-slate-200 animate-fadeIn space-y-6 print:hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-4">
+                <div>
+                  <h3 className="text-base font-bold text-slate-800 flex items-center gap-1.5">
+                    <FileText className="w-5 h-5 text-indigo-600" />
+                    Check-in Questionnaire Responses
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    View individual question responses submitted by team members during check-in.
+                  </p>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-col md:flex-row gap-3 items-center bg-slate-50/50 p-4 rounded-xl border border-slate-200">
+                <div className="relative flex-grow w-full">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search by member name or email..."
+                    value={searchTermResponses}
+                    onChange={(e) => setSearchTermResponses(e.target.value)}
+                    className="glass-input pl-9 pr-4 py-2 w-full rounded-xl text-xs bg-white"
+                  />
+                </div>
+                <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-xl w-full md:w-auto shrink-0 justify-between">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0">Filter Date:</span>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="date"
+                      value={filterDateResponses}
+                      onChange={(e) => setFilterDateResponses(e.target.value)}
+                      className="bg-transparent border-none outline-none text-xs text-slate-700 font-medium"
+                    />
+                    {filterDateResponses && (
+                      <button 
+                        onClick={() => setFilterDateResponses('')}
+                        className="text-[10px] text-rose-500 font-semibold hover:underline"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Responses List */}
+              {(() => {
+                const logsWithAnswers = logs.filter(log => log.checkInAnswers && log.checkInAnswers.length > 0);
+                const filteredResponses = logsWithAnswers.filter(log => {
+                  const memberName = log.memberId?.name || 'Unknown';
+                  const memberEmail = log.memberId?.email || '';
+                  const matchesSearch = memberName.toLowerCase().includes(searchTermResponses.toLowerCase()) ||
+                                        memberEmail.toLowerCase().includes(searchTermResponses.toLowerCase());
+                  const matchesDate = !filterDateResponses || log.date === filterDateResponses;
+                  return matchesSearch && matchesDate;
+                });
+
+                if (filteredResponses.length === 0) {
+                  return (
+                    <div className="text-center py-12 bg-slate-50/30 rounded-2xl border border-dashed border-slate-200">
+                      <FileText className="w-10 h-10 mx-auto mb-2.5 text-slate-300" />
+                      <p className="text-xs font-semibold text-slate-500">No question responses found</p>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {logsWithAnswers.length === 0 
+                          ? "Members have not submitted any check-in feedback yet." 
+                          : "Try adjusting your search query or date filter."}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredResponses.map((log) => {
+                      const memberName = log.memberId?.name || 'Unknown';
+                      const memberEmail = log.memberId?.email || 'N/A';
+                      const profileImage = log.memberId?.profileImage;
+
+                      return (
+                        <div key={log._id || log.id} className="glass-panel p-5 rounded-2xl border border-slate-200 hover:border-indigo-400 hover:shadow-md transition duration-200 flex flex-col justify-between space-y-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              {profileImage ? (
+                                <img
+                                  src={profileImage}
+                                  alt={memberName}
+                                  className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-sm font-bold text-indigo-600">
+                                  {memberName.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <div>
+                                <h4 className="text-xs font-bold text-slate-800">{memberName}</h4>
+                                <p className="text-[10px] text-slate-500">{memberEmail}</p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-150">
+                              {new Date(log.checkInTime).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2.5 pt-2 border-t border-slate-100 flex-grow">
+                            {log.checkInAnswers.map((ans: any, idx: number) => (
+                              <div key={idx} className="space-y-1">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                  Q: {ans.questionText}
+                                </p>
+                                <div className="bg-indigo-50/35 border border-indigo-100/50 p-2.5 rounded-xl text-xs text-indigo-950 font-medium italic">
+                                  "{ans.answer}"
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* TAB 5: CHECK-IN QUESTIONS SETUP */}
+          {activeTab === 'questions' && (
+            <div className="glass-panel p-6 rounded-2xl border border-slate-200 animate-fadeIn space-y-6 max-w-3xl mx-auto print:hidden">
+              <div className="flex justify-between items-center border-b border-slate-105 pb-4">
+                <div>
+                  <h3 className="text-base font-bold text-slate-800 flex items-center gap-1.5">
+                    <HelpCircle className="w-5 h-5 text-indigo-600" />
+                    Configure Check-in Questions
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Create questions that members must answer immediately after checking in.
+                  </p>
+                </div>
+                <button
+                  onClick={handleAddQuestion}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition active:scale-[0.98]"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Question
+                </button>
+              </div>
+
+              {questionsMsg.text && (
+                <div className={`p-3 rounded-xl text-xs border font-semibold ${
+                  questionsMsg.type === 'success' 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                    : 'bg-rose-50 border-rose-200 text-rose-700'
+                }`}>
+                  {questionsMsg.text}
+                </div>
+              )}
+
+              {localQuestions.length === 0 ? (
+                <div className="text-center py-10 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                  <HelpCircle className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                  <p className="text-xs font-semibold text-slate-500">No check-in questions configured</p>
+                  <p className="text-[10px] text-slate-400 mt-1">Click "Add Question" above to prompt members for feedback when they check in.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {localQuestions.map((q, idx) => (
+                    <div key={idx} className="p-4 bg-slate-50/70 border border-slate-200 rounded-xl space-y-3 relative group">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteQuestion(idx)}
+                        className="absolute top-4 right-4 text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg transition"
+                        title="Delete Question"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="md:col-span-2">
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Question #{idx + 1}
+                          </label>
+                          <input
+                            type="text"
+                            value={q.questionText}
+                            onChange={(e) => handleUpdateQuestion(idx, 'questionText', e.target.value)}
+                            placeholder="e.g. Rate your mentoring session today"
+                            className="glass-input w-full px-3.5 py-2 rounded-xl text-xs"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Question Type
+                          </label>
+                          <select
+                            value={q.questionType}
+                            onChange={(e) => handleUpdateQuestion(idx, 'questionType', e.target.value)}
+                            className="glass-input w-full px-3.5 py-2 rounded-xl text-xs bg-white cursor-pointer font-medium"
+                          >
+                            <option value="short_answer">Short Answer (Text)</option>
+                            <option value="rating">Rating (1 to 5)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {q.questionType === 'rating' && (
+                        <div className="text-[10px] text-slate-505 font-semibold bg-white border border-slate-150 px-3 py-2 rounded-xl w-fit flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                          <span>Predefined rating buttons (1, 2, 3, 4, 5) will be shown to members.</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  <div className="flex justify-end pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={handleSaveQuestions}
+                      disabled={questionsLoading}
+                      className="flex items-center justify-center gap-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition active:scale-[0.98] disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      {questionsLoading ? 'Saving...' : 'Save Check-in Questions'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

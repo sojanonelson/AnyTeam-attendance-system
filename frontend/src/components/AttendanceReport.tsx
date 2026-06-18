@@ -407,70 +407,98 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
                   </td>
                 </tr>
               ) : (
-                currentLogs.map((log) => (
-                  <tr key={log._id || log.id} className="hover:bg-slate-50/50 transition duration-150">
-                    {viewMode === 'admin' && (
-                      <td className="p-4 flex items-center gap-2.5">
-                        {log.memberId?.profileImage ? (
-                          <img
-                            src={log.memberId.profileImage}
-                            alt={log.memberId.name}
-                            className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-bold text-indigo-650">
-                            {log.memberId?.name ? log.memberId.name.charAt(0).toUpperCase() : 'U'}
-                          </div>
+                currentLogs.map((log) => {
+                  const hasFeedback = log.checkInAnswers && log.checkInAnswers.length > 0;
+                  const isVirtualAbsent = log._id && typeof log._id === 'string' && log._id.startsWith('absent');
+                  return (
+                    <React.Fragment key={log._id || log.id}>
+                      <tr className="hover:bg-slate-50/50 transition duration-150">
+                        {viewMode === 'admin' && (
+                          <td className="p-4 flex items-center gap-2.5">
+                            {log.memberId?.profileImage ? (
+                              <img
+                                src={log.memberId.profileImage}
+                                alt={log.memberId.name}
+                                className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-bold text-indigo-650">
+                                {log.memberId?.name ? log.memberId.name.charAt(0).toUpperCase() : 'U'}
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-xs font-semibold text-slate-800">{log.memberId?.name || 'Unknown'}</p>
+                              <p className="text-[10px] text-slate-500">{log.memberId?.email || 'N/A'}</p>
+                            </div>
+                          </td>
                         )}
-                        <div>
-                          <p className="text-xs font-semibold text-slate-800">{log.memberId?.name || 'Unknown'}</p>
-                          <p className="text-[10px] text-slate-500">{log.memberId?.email || 'N/A'}</p>
-                        </div>
-                      </td>
-                    )}
-                    <td className="p-4 text-xs font-semibold text-slate-700">
-                      {formatDateString(log.checkInTime)}
-                    </td>
-                    <td className="p-4 text-xs text-slate-850 font-bold">
-                      {log.status === 'absent' ? (
-                        <span className="text-slate-400 font-mono text-[10px]">--:--</span>
-                      ) : (
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                          {formatTimeString(log.checkInTime)}
-                        </div>
+                        <td className="p-4 text-xs font-semibold text-slate-700">
+                          {formatDateString(log.checkInTime)}
+                        </td>
+                        <td className="p-4 text-xs text-slate-855 font-bold">
+                          {log.status === 'absent' && isVirtualAbsent ? (
+                            <span className="text-slate-400 font-mono text-[10px]">--:--</span>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                              {formatTimeString(log.checkInTime)}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-4 text-xs text-slate-855 font-bold">
+                          {log.status === 'absent' ? (
+                            <span className="text-slate-400 font-mono text-[10px]">--:--</span>
+                          ) : log.checkOutTime ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                              {formatTimeString(log.checkOutTime)}
+                            </div>
+                          ) : (
+                            <span className="text-emerald-600 font-semibold text-[10px]">OK</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-xs font-bold text-slate-655 font-mono">
+                          {log.status === 'absent' ? (
+                            <span className="text-slate-400 font-normal">--</span>
+                          ) : (
+                            calculateDuration(log.checkInTime, log.checkOutTime)
+                          )}
+                        </td>
+                        <td className="p-4">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
+                            log.status === 'absent' 
+                              ? (isVirtualAbsent ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-amber-50 text-amber-600 border-amber-100')
+                              : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                          }`}>
+                            {log.status === 'absent' && !isVirtualAbsent ? 'pending' : log.status}
+                          </span>
+                        </td>
+                      </tr>
+                      {hasFeedback && (
+                        <tr className="bg-indigo-50/10">
+                          <td colSpan={viewMode === 'admin' ? 6 : 5} className="p-3.5 border-t border-slate-100">
+                            <div className="pl-6 md:pl-10 space-y-1.5 py-1 text-left">
+                              <p className="text-[10px] font-bold text-indigo-755 uppercase tracking-wider flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                                Check-in Responses:
+                              </p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                {log.checkInAnswers.map((ans: any, idx: number) => (
+                                  <div key={idx} className="flex flex-col sm:flex-row sm:items-start gap-1">
+                                    <span className="font-semibold text-slate-700 shrink-0">{ans.questionText}:</span>
+                                    <span className="text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-150 shadow-sm w-fit italic text-[11px]">
+                                      "{ans.answer}"
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                    <td className="p-4 text-xs text-slate-850 font-bold">
-                      {log.status === 'absent' ? (
-                        <span className="text-slate-400 font-mono text-[10px]">--:--</span>
-                      ) : log.checkOutTime ? (
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                          {formatTimeString(log.checkOutTime)}
-                        </div>
-                      ) : (
-                        <span className="text-emerald-600 font-semibold text-[10px]">OK</span>
-                      )}
-                    </td>
-                    <td className="p-4 text-xs font-bold text-slate-655 font-mono">
-                      {log.status === 'absent' ? (
-                        <span className="text-slate-400 font-normal">--</span>
-                      ) : (
-                        calculateDuration(log.checkInTime, log.checkOutTime)
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
-                        log.status === 'absent' 
-                          ? 'bg-rose-50 text-rose-600 border-rose-100' 
-                          : 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                      }`}>
-                        {log.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                    </React.Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -484,48 +512,50 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
               No attendance records found matching filters.
             </div>
           ) : (
-            currentLogs.map((log) => (
-              <div key={log._id || log.id} className="p-4 space-y-3 bg-white hover:bg-slate-550/50 transition duration-150">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-slate-800">
-                    {formatDateString(log.checkInTime)}
-                  </span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border ${
-                    log.status === 'absent' 
-                      ? 'bg-rose-50 text-rose-600 border-rose-100' 
-                      : 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                  }`}>
-                    {log.status}
-                  </span>
-                </div>
-                
-                {viewMode === 'admin' && (
-                  <div className="flex items-center gap-2.5 bg-slate-50 p-2 rounded-xl border border-slate-100">
-                    {log.memberId?.profileImage ? (
-                      <img
-                        src={log.memberId.profileImage}
-                        alt={log.memberId.name}
-                        className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-indigo-50 border border-slate-200 flex items-center justify-center text-xs font-bold text-indigo-650">
-                        {log.memberId?.name ? log.memberId.name.charAt(0).toUpperCase() : 'U'}
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-xs font-bold text-slate-805">{log.memberId?.name || 'Unknown'}</p>
-                      <p className="text-[10px] text-slate-500">{log.memberId?.email || 'N/A'}</p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                    <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">In</span>
-                    <span className="font-bold text-slate-800 font-mono">
-                      {log.status === 'absent' ? '--:--' : formatTimeString(log.checkInTime)}
+            currentLogs.map((log) => {
+              const isVirtualAbsent = log._id && typeof log._id === 'string' && log._id.startsWith('absent');
+              return (
+                <div key={log._id || log.id} className="p-4 space-y-3 bg-white hover:bg-slate-550/50 transition duration-150">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-slate-808">
+                      {formatDateString(log.checkInTime)}
+                    </span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border ${
+                      log.status === 'absent' 
+                        ? (isVirtualAbsent ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-amber-50 text-amber-600 border-amber-100')
+                        : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                    }`}>
+                      {log.status === 'absent' && !isVirtualAbsent ? 'pending' : log.status}
                     </span>
                   </div>
+                  
+                  {viewMode === 'admin' && (
+                    <div className="flex items-center gap-2.5 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                      {log.memberId?.profileImage ? (
+                        <img
+                          src={log.memberId.profileImage}
+                          alt={log.memberId.name}
+                          className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-indigo-50 border border-slate-200 flex items-center justify-center text-xs font-bold text-indigo-650">
+                          {log.memberId?.name ? log.memberId.name.charAt(0).toUpperCase() : 'U'}
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-xs font-bold text-slate-850">{log.memberId?.name || 'Unknown'}</p>
+                        <p className="text-[10px] text-slate-500">{log.memberId?.email || 'N/A'}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">In</span>
+                      <span className="font-bold text-slate-800 font-mono">
+                        {log.status === 'absent' && isVirtualAbsent ? '--:--' : formatTimeString(log.checkInTime)}
+                      </span>
+                    </div>
                   <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
                     <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Out</span>
                     <span className="font-bold text-slate-805 font-mono">
@@ -539,9 +569,27 @@ export const AttendanceReport: React.FC<AttendanceReportProps> = ({
                     </span>
                   </div>
                 </div>
+
+                {log.checkInAnswers && log.checkInAnswers.length > 0 && (
+                  <div className="bg-indigo-50/30 p-3 rounded-xl border border-indigo-100/50 space-y-1.5 text-left">
+                    <p className="text-[9px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1">
+                      <span className="w-1 h-1 rounded-full bg-indigo-500"></span>
+                      Check-in Responses:
+                    </p>
+                    <div className="space-y-1">
+                      {log.checkInAnswers.map((ans: any, idx: number) => (
+                        <div key={idx} className="text-[11px] leading-relaxed text-slate-600">
+                          <span className="font-semibold text-slate-800">{ans.questionText}: </span>
+                          <span className="italic">"{ans.answer}"</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            ))
-          )}
+            );
+          })
+        )}
         </div>
 
         {/* Pagination Controls */}

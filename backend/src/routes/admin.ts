@@ -146,6 +146,39 @@ router.get('/teams/:teamId/members', authMiddleware, async (req: AuthRequest, re
   }
 });
 
+// Update Team Check-in Questions
+router.put('/teams/:teamId/questions', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (req.user?.role !== 'team_admin' && req.user?.role !== 'system_admin') {
+      return res.status(403).json({ message: 'Access denied: admins only' });
+    }
+    const { teamId } = req.params;
+    const { checkInQuestions } = req.body;
+
+    if (!Array.isArray(checkInQuestions)) {
+      return res.status(400).json({ message: 'checkInQuestions must be an array' });
+    }
+
+    // Verify admin owns the team (system admins can bypass)
+    if (req.user?.role !== 'system_admin') {
+      const team = await Team.findOne({ _id: teamId, adminId: req.user?.id });
+      if (!team) {
+        return res.status(404).json({ message: 'Team not found or unauthorized' });
+      }
+    }
+
+    const team = await Team.findByIdAndUpdate(
+      teamId,
+      { checkInQuestions },
+      { new: true }
+    );
+
+    res.json({ message: 'Check-in questions updated successfully!', team });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // System Admin: Get Overview Stats
 router.get('/system/overview', authMiddleware, async (req: AuthRequest, res) => {
   try {

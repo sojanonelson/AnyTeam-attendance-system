@@ -410,7 +410,7 @@ Feeling proud of this achievement and ready for the next challenge! #internship 
           </button>
           <button
             onClick={handleDownloadPNG}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition active:scale-[0.98] cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition active:scale-[0.98] cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Download PNG</span>

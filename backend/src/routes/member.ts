@@ -5,6 +5,7 @@ import Team from '../models/Team';
 import Member from '../models/Member';
 import AttendanceLog from '../models/AttendanceLog';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { sendCheckInEmail } from '../services/emailService';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkeyforattendanceappqr2026';
@@ -151,12 +152,63 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res) => {
       return res.status(403).json({ message: 'Access denied: not a member' });
     }
 
-    const member = await Member.findById(req.user.id).select('-password').populate('teamId', 'name');
+    const member = await Member.findById(req.user.id).select('-password').populate('teamId', 'name checkInQuestions');
     if (!member) {
       return res.status(404).json({ message: 'Member not found' });
     }
 
     res.json(member);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Submit check-in answers for today
+router.post('/attendance/today/answers', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    if (req.user?.role !== 'member') {
+      return res.status(403).json({ message: 'Access denied: members only' });
+    }
+
+    const { answers } = req.body;
+    if (!answers || !Array.isArray(answers)) {
+      return res.status(400).json({ message: 'Answers array is required' });
+    }
+
+    // Find today's log (using local date string format YYYY-MM-DD)
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+
+    const log = await AttendanceLog.findOne({ 
+      memberId: req.user.id, 
+      teamId: req.user.teamId, 
+      date: todayStr 
+    });
+
+    if (!log) {
+      return res.status(404).json({ message: 'No check-in record found for today' });
+    }
+
+    log.checkInAnswers = answers;
+    log.status = 'present'; // Mark status as present now that answers are submitted
+    await log.save();
+
+    // Send check-in email notification asynchronously (non-blocking)
+    try {
+      const member = await Member.findById(req.user.id);
+      if (member && member.email) {
+        sendCheckInEmail(member.email, member.name).catch((err) => {
+          console.error('[Member Route] Error sending check-in email in background:', err);
+        });
+      }
+    } catch (emailErr) {
+      console.error('[Member Route] Error retrieving member info for check-in email:', emailErr);
+    }
+
+    res.json({ message: 'Check-in feedback submitted successfully!', log });
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

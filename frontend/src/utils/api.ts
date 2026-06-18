@@ -105,6 +105,12 @@ export const api = {
         body: JSON.stringify({ email }),
       }, 'admin'),
 
+    updateTeamQuestions: (teamId: string, checkInQuestions: any[]) =>
+      request<any>(`/admin/teams/${teamId}/questions`, {
+        method: 'PUT',
+        body: JSON.stringify({ checkInQuestions }),
+      }, 'admin'),
+
     system: {
       getOverview: () =>
         request<{ stats: any; teams: any[] }>('/admin/system/overview', { method: 'GET' }, 'admin'),
@@ -145,6 +151,12 @@ export const api = {
       request<any>('/member/mark-past-attendance', {
         method: 'POST',
         body: JSON.stringify({ date }),
+      }, 'member'),
+
+    submitCheckInAnswers: (answers: any[]) =>
+      request<any>('/member/attendance/today/answers', {
+        method: 'POST',
+        body: JSON.stringify({ answers }),
       }, 'member'),
   },
 

@@ -41,6 +41,12 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({
   const [editStatus, setEditStatus] = useState('Available');
   const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
 
+  // Check-in Questions States
+  const [showQuestionsForm, setShowQuestionsForm] = useState(false);
+  const [answers, setAnswers] = useState<{[key: string]: string}>({});
+  const [submitAnswersLoading, setSubmitAnswersLoading] = useState(false);
+  const [submitAnswersError, setSubmitAnswersError] = useState('');
+
   // History & Status
   const [logs, setLogs] = useState<any[]>([]);
   const [todayStatus, setTodayStatus] = useState<any>(null);
@@ -95,6 +101,46 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({
       setTodayStatus(todayLog || null);
     } catch (err: any) {
       console.error('Failed to fetch member history:', err);
+    }
+  };
+
+  // Sync answers form default options when showQuestionsForm triggers
+  useEffect(() => {
+    if (showQuestionsForm && memberUser?.teamId?.checkInQuestions) {
+      const initial: {[key: string]: string} = {};
+      memberUser.teamId.checkInQuestions.forEach((q: any) => {
+        initial[q.questionText] = q.questionType === 'rating' ? '5' : '';
+      });
+      setAnswers(initial);
+      setSubmitAnswersError('');
+    }
+  }, [showQuestionsForm, memberUser]);
+
+  const hasPendingQuestions = !!(
+    todayStatus &&
+    (!todayStatus.checkInAnswers || todayStatus.checkInAnswers.length === 0) &&
+    memberUser?.teamId?.checkInQuestions &&
+    memberUser.teamId.checkInQuestions.length > 0
+  );
+
+  const handleSubmitAnswers = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitAnswersLoading(true);
+    setSubmitAnswersError('');
+
+    const formattedAnswers = Object.entries(answers).map(([questionText, answer]) => ({
+      questionText,
+      answer
+    }));
+
+    try {
+      await api.member.submitCheckInAnswers(formattedAnswers);
+      setShowQuestionsForm(false);
+      fetchHistoryAndProfile();
+    } catch (err: any) {
+      setSubmitAnswersError(err.message || 'Failed to submit feedback');
+    } finally {
+      setSubmitAnswersLoading(false);
     }
   };
 
@@ -403,7 +449,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({
       {/* Top Banner (App Header) */}
       <div className="glass-panel p-4 rounded-2xl flex justify-between items-center border border-slate-200 bg-white/70 backdrop-blur-md print:hidden">
         <div className="flex items-center gap-2.5">
-          <div className="bg-indigo-650/10 p-2 rounded-xl text-indigo-655">
+          <div className="bg-indigo-600/10 p-2 rounded-xl text-indigo-600">
             <UserCheck className="w-5 h-5 text-indigo-600" />
           </div>
           <div>
@@ -464,6 +510,112 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({
           <span>Profile Info</span>
         </button>
       </div>
+
+      {/* Pending Check-in Questions Banner */}
+      {hasPendingQuestions && !showQuestionsForm && (
+        <div className="glass-panel p-4 rounded-2xl border border-indigo-200 bg-indigo-50/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 animate-pulse">
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold text-indigo-800 uppercase tracking-wider flex items-center gap-1.5">
+              <BookOpen className="w-4 h-4" />
+              Pending Check-in Feedback
+            </h4>
+            <p className="text-[11px] text-indigo-600">
+              Please complete your check-in questionnaire for today. Your responses will be visible to your team administrator.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowQuestionsForm(true)}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition active:scale-[0.98] cursor-pointer whitespace-nowrap self-stretch sm:self-auto text-center"
+          >
+            Fill Feedback
+          </button>
+        </div>
+      )}
+
+      {/* Check-in Questions Modal Overlay */}
+      {showQuestionsForm && memberUser?.teamId?.checkInQuestions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="glass-panel w-full max-w-lg p-6 rounded-2xl bg-white shadow-2xl border border-slate-200 relative overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl pointer-events-none"></div>
+
+            <div className="text-center mb-6">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center justify-center gap-2">
+                <BookOpen className="text-indigo-600 w-5 h-5" />
+                Check-in Questionnaire
+              </h3>
+              <p className="text-xs text-slate-505 mt-1">
+                Please answer the following questions to complete your check-in.
+              </p>
+            </div>
+
+            {submitAnswersError && (
+              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0" />
+                <span>{submitAnswersError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitAnswers} className="space-y-5">
+              <div className="max-h-[50vh] overflow-y-auto pr-1 space-y-4">
+                {memberUser.teamId.checkInQuestions.map((q: any, idx: number) => (
+                  <div key={idx} className="space-y-2">
+                    <label className="block text-xs font-semibold text-slate-705">
+                      {idx + 1}. {q.questionText}
+                    </label>
+
+                    {q.questionType === 'rating' ? (
+                      <div className="flex justify-between gap-2">
+                        {['1', '2', '3', '4', '5'].map((val) => {
+                          const isSelected = answers[q.questionText] === val;
+                          return (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => setAnswers(prev => ({ ...prev, [q.questionText]: val }))}
+                              className={`flex-1 py-2 rounded-xl text-xs font-bold border transition duration-150 ${
+                                isSelected 
+                                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/10'
+                                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                              }`}
+                            >
+                              {val}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <textarea
+                        value={answers[q.questionText] || ''}
+                        onChange={(e) => setAnswers(prev => ({ ...prev, [q.questionText]: e.target.value }))}
+                        placeholder="Type your answer here..."
+                        className="glass-input w-full px-3 py-2 rounded-xl text-xs min-h-[80px]"
+                        required
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-3 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowQuestionsForm(false)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-205 text-slate-655 rounded-xl text-xs font-semibold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitAnswersLoading}
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition disabled:opacity-50 active:scale-[0.98]"
+                >
+                  {submitAnswersLoading ? 'Submitting...' : 'Submit Answers'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
@@ -543,7 +695,12 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({
           {/* TAB: SCAN QR */}
           {activeTab === 'scan' && (
             <div className="animate-fadeIn">
-              <QRScanner onSuccess={fetchHistoryAndProfile} />
+              <QRScanner onSuccess={async (res: any) => {
+                await fetchHistoryAndProfile();
+                if (res.action === 'check-in' && res.hasQuestions) {
+                  setShowQuestionsForm(true);
+                }
+              }} />
             </div>
           )}
 

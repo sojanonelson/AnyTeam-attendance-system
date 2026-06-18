@@ -5,7 +5,7 @@ import { Camera, AlertCircle, CheckCircle, RefreshCw, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface QRScannerProps {
-  onSuccess?: (result: { action: 'check-in' | 'check-out'; time: string; message: string }) => void;
+  onSuccess?: (result: { action: 'check-in' | 'check-out'; time: string; message: string; hasQuestions?: boolean }) => void;
 }
 
 export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
@@ -14,6 +14,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [isInitializing, setIsInitializing] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
+  const [localToken, setLocalToken] = useState<string>('');
 
   const qrReaderRef = useRef<Html5Qrcode | null>(null);
   const scannerId = 'qr-reader-element';
@@ -244,16 +245,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
             <span className="inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-700 uppercase tracking-wide">
               {scanResult.action} Complete
             </span>
-            <button
-              onClick={() => {
-                if (typeof navigator !== 'undefined' && navigator.vibrate) {
-                  navigator.vibrate(200);
-                }
-              }}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition cursor-pointer active:scale-95"
-            >
-              Test Haptic Vibration
-            </button>
+
             <button
               onClick={() => {
                 setScanResult(null);
@@ -314,7 +306,34 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onSuccess }) => {
             </AnimatePresence>
           </motion.button>
 
-         
+          {/* Developer Local Token Paste Box */}
+          {(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || import.meta.env.DEV) && (
+            <div className="pt-4 border-t border-slate-100 space-y-2 text-left">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Developer Local: Paste Attendance Token
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Paste QR token here..."
+                  value={localToken}
+                  onChange={(e) => setLocalToken(e.target.value)}
+                  className="glass-input flex-grow px-3 py-2.5 rounded-xl text-xs bg-white font-mono"
+                />
+                <button
+                  onClick={() => {
+                    if (localToken.trim()) {
+                      handleVerifyToken(localToken.trim());
+                      setLocalToken('');
+                    }
+                  }}
+                  className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer shrink-0"
+                >
+                  Verify
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
